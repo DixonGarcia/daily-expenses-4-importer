@@ -1,0 +1,43 @@
+# Daily Expenses 4 Importer Configuration Template
+# Copy this file to data/config.toml and adjust your settings.
+
+# Supported expense categories in your Daily Expenses 4 account
+categories = [
+  "Autopista",
+  "Bebidas",
+  "Comida",
+  "Diversión",
+  "Gasolina",
+  "Hijo",
+  "Hogar",
+  "Mascota",
+  "Mercancía",
+  "Otros",
+  "Personales",
+  "Propinas",
+  "Restaurante",
+  "Ropa",
+  "Salud",
+  "Servicios",
+  "Supermercado",
+  "Transporte",
+  "Vehículo",
+  "Viajes",
+  "Vivienda"
+]
+
+# Account Profiles
+# Define each account you want to import transactions into.
+
+[accounts.default]
+name = "Personal Checking"
+currency = "USD"
+parser = "csv"
+decimal_mode = "exact" # "exact" (keeps cents) or "round_half_up"
+
+[accounts.credit_card]
+name = "TDC - Banesco"
+currency = "USD"
+parser = "banesco_panama_tdc"
+source_transfer_account = "BanPa Personal"
+decimal_mode = "exact"

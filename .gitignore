@@ -1,0 +1,32 @@
+# Virtual Environment
+.venv/
+env/
+venv/
+ENV/
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local sensitive configuration & runtime databases
+data/config.toml
+data/*.db
+data/session_cookies.json
+tmp/
+*.log
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+*.swp

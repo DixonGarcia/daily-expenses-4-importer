@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "daily-expenses-4-importer"
+version = "2.0.0"
+description = "Automated statement importer & Playwright web loader for Daily Expenses 4 (dailyexpenses4.com)"
+readme = "README.md"
+authors = [{ name = "Dixon Garcia" }]
+requires-python = ">=3.11"
+dependencies = [
+    "playwright>=1.40.0",
+    "questionary>=2.0.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[project.scripts]
+daily-expenses-importer = "daily_expenses_importer.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["daily_expenses_importer*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
