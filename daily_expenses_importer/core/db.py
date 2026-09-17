@@ -1,5 +1,8 @@
 """SQLite database for merchant rules and processed transactions."""
 
+from __future__ import annotations
+
+import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -53,15 +56,29 @@ class Database:
         cur = self._connection.execute("SELECT id, pattern, category, description, is_regex FROM merchant_rules")
         desc_lower = description.lower()
         for row in cur.fetchall():
-            pattern = row["pattern"].lower()
-            if pattern in desc_lower:
-                return MerchantRule(
-                    id=row["id"],
-                    pattern=row["pattern"],
-                    category=row["category"],
-                    description=row["description"],
-                    is_regex=bool(row["is_regex"]),
-                )
+            is_regex = bool(row["is_regex"])
+            if is_regex:
+                try:
+                    if re.search(row["pattern"], description, re.IGNORECASE):
+                        return MerchantRule(
+                            id=row["id"],
+                            pattern=row["pattern"],
+                            category=row["category"],
+                            description=row["description"],
+                            is_regex=True,
+                        )
+                except re.error:
+                    continue
+            else:
+                pattern = row["pattern"].lower()
+                if pattern in desc_lower:
+                    return MerchantRule(
+                        id=row["id"],
+                        pattern=row["pattern"],
+                        category=row["category"],
+                        description=row["description"],
+                        is_regex=False,
+                    )
         return None
 
     def add_rule(self, pattern: str, category: str, description: str, is_regex: bool = False) -> None:
@@ -124,3 +141,13 @@ class Database:
         else:
             cur = self._connection.execute("SELECT * FROM processed_transactions")
         return [dict(r) for r in cur.fetchall()]
+
+    def close(self) -> None:
+        """Close the database connection."""
+        self._connection.close()
+
+    def __enter__(self) -> Database:
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()

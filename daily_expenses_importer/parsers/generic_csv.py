@@ -233,6 +233,10 @@ class GenericCsvParser(BaseParser):
         if not text:
             return Decimal("0")
         clean = text.replace("$", "").replace("€", "").replace("USD", "").replace(" ", "").strip()
+        is_negative = False
+        if clean.startswith("(") and clean.endswith(")"):
+            clean = clean[1:-1].strip()
+            is_negative = True
         if "," in clean and "." in clean:
             if clean.rfind(",") > clean.rfind("."):
                 clean = clean.replace(".", "").replace(",", ".")
@@ -241,7 +245,8 @@ class GenericCsvParser(BaseParser):
         elif "," in clean:
             clean = clean.replace(",", ".")
         try:
-            return Decimal(clean)
+            val = Decimal(clean)
+            return -val if is_negative else val
         except Exception:
             return Decimal("0")
 

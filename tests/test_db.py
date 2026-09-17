@@ -24,3 +24,22 @@ def test_processed_transactions_and_status(temp_db: Database):
     temp_db.mark_processed(ref, Decimal("15.50"), "Test Purchase", "Dining", status="failed", overwrite=True)
     assert not temp_db.is_processed(ref)  # failed is not considered successfully processed
     assert temp_db.get_transaction_status(ref) == "failed"
+
+
+def test_merchant_rules_with_regex(temp_db: Database):
+    temp_db.add_rule(pattern=r"^UBER\s*\*(TRIP|EATS)", category="Transportation", description="Uber", is_regex=True)
+    rule = temp_db.find_rule("UBER *TRIP 12345 SAN FRANCISCO")
+    assert rule is not None
+    assert rule.is_regex is True
+    assert rule.category == "Transportation"
+    assert rule.description == "Uber"
+
+    # Does not match non-matching string
+    assert temp_db.find_rule("LYFT TRIP") is None
+
+
+def test_database_context_manager(tmp_path):
+    db_file = tmp_path / "ctx_test.db"
+    with Database(db_file) as db:
+        db.add_rule("Test", "Category", "Desc")
+        assert db.find_rule("Test") is not None

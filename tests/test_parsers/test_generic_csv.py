@@ -97,3 +97,24 @@ def test_generic_csv_parses_spanish_headers_and_comma_decimals(tmp_path: Path):
     assert txs[1].date == date(2026, 9, 16)
     assert txs[1].amount == Decimal("850.00")
     assert txs[1].tx_type == TransactionType.INCOME
+
+
+def test_generic_csv_parses_accounting_parentheses_amounts(tmp_path: Path):
+    content = """Date,Description,Amount
+2026-09-20,Bank Fee,(15.50)
+2026-09-21,Interest Earned,2.30
+"""
+    file_path = tmp_path / "accounting.csv"
+    file_path.write_text(content, encoding="utf-8")
+
+    parser = GenericCsvParser()
+    txs = parser.parse(file_path)
+    assert len(txs) == 2
+
+    assert txs[0].description == "Bank Fee"
+    assert txs[0].amount == Decimal("15.50")
+    assert txs[0].tx_type == TransactionType.EXPENSE
+
+    assert txs[1].description == "Interest Earned"
+    assert txs[1].amount == Decimal("2.30")
+    assert txs[1].tx_type == TransactionType.INCOME

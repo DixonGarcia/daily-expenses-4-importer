@@ -244,7 +244,10 @@ def run(
                     "⏭️ Skip this transaction",
                 ],
             ).ask()
-            if choice and choice.startswith("✅"):
+            if choice is None:
+                console.print("\n[dim]Import aborted by user.[/dim]")
+                return
+            if choice.startswith("✅"):
                 classified_records.append({
                     "tx": tx,
                     "amount": tx.amount,
@@ -257,7 +260,7 @@ def run(
                     "tx_type": tx.tx_type,
                 })
                 continue
-            elif choice and choice.startswith("⏭️"):
+            elif choice.startswith("⏭️"):
                 db.mark_processed(tx.reference, 0, rec_desc, status="skipped")
                 continue
 
@@ -274,10 +277,23 @@ def run(
             ],
         ).ask()
 
-        if choice and choice.startswith("🏷️"):
-            cat = questionary.select("Select Category:", choices=categories).ask() or "Other"
-            desc = questionary.text("Edit Description:", default=tx.description).ask() or tx.description
+        if choice is None:
+            console.print("\n[dim]Import aborted by user.[/dim]")
+            return
+
+        if choice.startswith("🏷️"):
+            cat = questionary.select("Select Category:", choices=categories).ask()
+            if cat is None:
+                console.print("\n[dim]Import aborted by user.[/dim]")
+                return
+            desc = questionary.text("Edit Description:", default=tx.description).ask()
+            if desc is None:
+                console.print("\n[dim]Import aborted by user.[/dim]")
+                return
             save_rule = questionary.confirm("Save rule for future occurrences?", default=True).ask()
+            if save_rule is None:
+                console.print("\n[dim]Import aborted by user.[/dim]")
+                return
             if save_rule:
                 db.add_rule(pattern=desc, category=cat, description=desc)
 
@@ -292,7 +308,7 @@ def run(
                 "time": tx.time,
                 "tx_type": tx.tx_type,
             })
-        else:
+        elif choice.startswith("⏭️"):
             db.mark_processed(tx.reference, 0, tx.description, status="skipped")
 
     if not classified_records:

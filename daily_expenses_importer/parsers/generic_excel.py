@@ -286,6 +286,10 @@ class GenericExcelParser(BaseParser):
         if isinstance(val, (int, float, Decimal)):
             return Decimal(str(val))
         text = str(val).replace("$", "").replace("€", "").replace("USD", "").replace(" ", "").strip()
+        is_negative = False
+        if text.startswith("(") and text.endswith(")"):
+            text = text[1:-1].strip()
+            is_negative = True
         if "," in text and "." in text:
             if text.rfind(",") > text.rfind("."):
                 text = text.replace(".", "").replace(",", ".")
@@ -294,6 +298,7 @@ class GenericExcelParser(BaseParser):
         elif "," in text:
             text = text.replace(",", ".")
         try:
-            return Decimal(text)
+            dec = Decimal(text)
+            return -dec if is_negative else dec
         except Exception:
             return Decimal("0")
