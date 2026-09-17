@@ -3,41 +3,44 @@
 
 # Supported expense categories in your Daily Expenses 4 account
 categories = [
-  "Autopista",
-  "Bebidas",
-  "Comida",
-  "Diversión",
-  "Gasolina",
-  "Hijo",
-  "Hogar",
-  "Mascota",
-  "Mercancía",
-  "Otros",
-  "Personales",
-  "Propinas",
-  "Restaurante",
-  "Ropa",
-  "Salud",
-  "Servicios",
-  "Supermercado",
-  "Transporte",
-  "Vehículo",
-  "Viajes",
-  "Vivienda"
+  "Bills",
+  "Clothing",
+  "Dining",
+  "Education",
+  "Entertainment",
+  "Fuel",
+  "Groceries",
+  "Healthcare",
+  "Home",
+  "Income",
+  "Insurance",
+  "Kids",
+  "Merchandise",
+  "Other",
+  "Personal",
+  "Pets",
+  "Subscriptions",
+  "Tips",
+  "Toll",
+  "Transfer",
+  "Transportation",
+  "Travel",
+  "Utilities",
+  "Vehicle"
 ]
 
 # Account Profiles
 # Define each account you want to import transactions into.
 
 [accounts.default]
-name = "Personal Checking"
+name = "Checking Account"
 currency = "USD"
-parser = "csv"
+parser = "generic_csv"
 decimal_mode = "exact" # "exact" (keeps cents) or "round_half_up"
 
 [accounts.credit_card]
-name = "TDC - Banesco"
+name = "Credit Card"
 currency = "USD"
-parser = "banesco_panama_tdc"
-source_transfer_account = "BanPa Personal"
+parser = "generic_excel"
+source_transfer_account = "Checking Account"
 decimal_mode = "exact"

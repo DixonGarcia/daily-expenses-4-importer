@@ -3,10 +3,10 @@
 from pathlib import Path
 from daily_expenses_importer.parsers.base import BaseParser, NormalizedTransaction, TransactionType
 from daily_expenses_importer.parsers.generic_csv import GenericCsvParser
-from daily_expenses_importer.parsers.banesco_panama_tdc import BanescoPanamaTdcParser
+from daily_expenses_importer.parsers.generic_excel import GenericExcelParser
 
 _AVAILABLE_PARSERS: list[BaseParser] = [
-    BanescoPanamaTdcParser(),
+    GenericExcelParser(),
     GenericCsvParser(),
 ]
 

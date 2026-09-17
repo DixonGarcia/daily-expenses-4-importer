@@ -27,6 +27,7 @@ class NormalizedTransaction:
     description: str
     raw_description: str
     tx_type: TransactionType = TransactionType.EXPENSE
+    category: str | None = None
     source_account: str | None = None
     target_account: str | None = None
     metadata: dict = field(default_factory=dict)
