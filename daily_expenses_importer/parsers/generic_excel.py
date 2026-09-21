@@ -12,9 +12,9 @@ from daily_expenses_importer.parsers.base import BaseParser, NormalizedTransacti
 _DATE_HEADERS = {"date", "fecha", "fecha y hora", "fecha/hora", "datetime", "date & time", "date and time", "transaction date", "fecha transaccion", "fecha transacción"}
 _DESC_HEADERS = {"description", "descripción", "descripcion", "concepto", "detalle", "merchant", "payee", "comercio", "notas", "nota"}
 _AMOUNT_HEADERS = {"amount", "monto", "importe", "valor"}
-_DEBIT_HEADERS = {"debit", "debito", "débito", "gasto", "egreso", "cargos"}
-_CREDIT_HEADERS = {"credit", "credito", "crédito", "ingreso", "abono", "abonos"}
-_REF_HEADERS = {"reference", "referencia", "ref", "id", "secuencia", "número", "numero"}
+_DEBIT_HEADERS = {"debit", "debito", "débito", "gasto", "egreso", "cargos", "expense", "expenses"}
+_CREDIT_HEADERS = {"credit", "credito", "crédito", "ingreso", "abono", "abonos", "income", "incomes"}
+_REF_HEADERS = {"reference", "referencia", "ref", "id", "secuencia", "número", "numero", "nro operacion"}
 _CAT_HEADERS = {"category", "categoría", "categoria", "rubro", "clasificación", "clasificacion"}
 _TYPE_HEADERS = {"type", "tipo", "tipo movimiento", "tipo de movimiento", "tipo_movimiento"}
 _ACCOUNT_HEADERS = {"account", "cuenta", "target account", "target_account", "cuenta destino", "cuenta_destino"}
@@ -208,7 +208,8 @@ class GenericExcelParser(BaseParser):
                 time_str = str(raw_time_col).strip()
 
         # Handle transfer accounts format: "Source -> Target"
-        if tx_type == TransactionType.TRANSFER and account_raw and "->" in account_raw:
+        if account_raw and "->" in account_raw:
+            tx_type = TransactionType.TRANSFER
             parts = [p.strip() for p in account_raw.split("->", 1)]
             source_acc = parts[0]
             target_acc = parts[1]

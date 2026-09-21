@@ -22,6 +22,7 @@ htmlcov/
 data/config.toml
 data/*.db
 data/session_cookies.json
+data/metadata.json
 tmp/
 *.log
 

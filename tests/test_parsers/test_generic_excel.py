@@ -10,7 +10,12 @@ from daily_expenses_importer.parsers.base import TransactionType
 
 def test_generic_excel_parses_generated_template(tmp_path: Path):
     template_file = tmp_path / "test_template.xlsx"
-    generate_excel_template(template_file)
+    generate_excel_template(
+        template_file,
+        accounts=["Checking Account", "Credit Card"],
+        expense_categories=["Groceries", "Healthcare", "Dining"],
+        income_categories=["Income"],
+    )
 
     parser = GenericExcelParser()
     assert parser.supports(template_file, b"")

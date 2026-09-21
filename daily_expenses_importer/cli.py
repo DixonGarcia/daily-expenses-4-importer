@@ -15,6 +15,11 @@ from rich.table import Table
 from daily_expenses_importer.core.db import Database
 from daily_expenses_importer.core.classifier import classify
 from daily_expenses_importer.core.logger import log_session_start, log_session_end
+from daily_expenses_importer.core.metadata_fetcher import (
+    fetch_app_metadata,
+    save_cached_metadata,
+    load_cached_metadata,
+)
 from daily_expenses_importer.core.template_generator import (
     DEFAULT_CATEGORIES,
     generate_excel_template,
@@ -113,46 +118,107 @@ def _print_failed_table(failed_records: list[dict]) -> None:
 
 
 def _export_failed_csv(failed_records: list[dict], export_path: Path) -> None:
-    """Export failed records to a CSV file matching the standard template format."""
+    """Export failed records to a CSV file matching the Accounting Ledger template format."""
     with open(export_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["date", "description", "category", "amount", "type", "account"])
+        writer.writerow(["date", "description", "expense", "income", "category", "account"])
         for r in failed_records:
             tx: NormalizedTransaction = r["tx"]
-            tx_type_str = (
-                "transfer" if tx.tx_type == TransactionType.TRANSFER
-                else "income" if tx.tx_type == TransactionType.INCOME
-                else "expense"
-            )
             acc_str = r.get("target_account", "")
             if tx.tx_type == TransactionType.TRANSFER:
                 acc_str = f"{r.get('source_account', '')} -> {r.get('target_account', '')}"
+
             time_str = f" {tx.time}" if tx.time else " 12:00:00"
             date_time_str = f"{tx.date.strftime('%Y-%m-%d')}{time_str}"
+
+            if tx.tx_type == TransactionType.INCOME:
+                expense_val = ""
+                income_val = f"{r['amount']:.2f}"
+            else:
+                expense_val = f"{r['amount']:.2f}"
+                income_val = ""
+
             writer.writerow([
                 date_time_str,
                 r["description"],
+                expense_val,
+                income_val,
                 r.get("category", ""),
-                f"{r['amount']:.2f}",
-                tx_type_str,
                 acc_str,
             ])
     console.print(f"[bold green]💾 Exported {len(failed_records)} failed movements to: {export_path}[/bold green]")
 
 
-def generate_templates(target_dir: Path = Path(".")) -> None:
-    """Create sample template.xlsx and template.csv in target directory."""
+def generate_templates(target_dir: Path = Path("."), sync_first: bool = False, config: dict | None = None) -> None:
+    """Create sample template.xlsx and template.csv in target directory, optionally syncing live metadata."""
+    if sync_first:
+        console.print("[bold cyan]🔄 Syncing accounts and categories from Daily Expenses 4 before generating...[/bold cyan]")
+        try:
+            metadata = fetch_app_metadata(config=config, headless=True)
+            save_cached_metadata(metadata)
+            console.print("[green]✅ Successfully fetched live accounts and categories.[/green]")
+        except Exception as exc:
+            console.print(f"[yellow]⚠️ Could not sync live metadata: {exc}. Using existing cache or defaults.[/yellow]")
+
+    cached = load_cached_metadata()
+    if cached:
+        acc_count = len(cached.get("accounts", []))
+        exp_count = len(cached.get("expense_categories", []))
+        inc_count = len(cached.get("income_categories", []))
+        console.print(
+            f"[dim]ℹ️ Using synced metadata from Daily Expenses 4: "
+            f"{acc_count} accounts, {exp_count} expense categories, {inc_count} income categories.[/dim]"
+        )
+
     xlsx_path = target_dir / "template.xlsx"
     csv_path = target_dir / "template.csv"
 
     generate_excel_template(xlsx_path)
     generate_csv_template(csv_path)
 
-    console.print(f"[bold green]✅ Templates created successfully:[/bold green]")
-    console.print(f"  📊 Excel (with setup sheet & dropdowns): [cyan]{xlsx_path.resolve()}[/cyan]")
-    console.print(f"  📄 Plain CSV (date with time):          [cyan]{csv_path.resolve()}[/cyan]\n")
+    console.print(f"[bold green]✅ Templates created successfully (Accounting Ledger format):[/bold green]")
+    console.print(f"  📊 Excel (Setup & Movements sheets):  [cyan]{xlsx_path.resolve()}[/cyan]")
+    console.print(f"  📄 Plain CSV:                         [cyan]{csv_path.resolve()}[/cyan]\n")
     console.print("Fill either file with your movements and run:")
     console.print(f"  [cyan]daily-expenses-importer -i {xlsx_path.name}[/cyan]  (or [cyan]-i {csv_path.name}[/cyan])\n")
+
+
+def sync_metadata_command(config: dict | None = None, visible: bool = False) -> None:
+    """CLI command to sync accounts and categories from Daily Expenses 4 and display them."""
+    console.print("───────────────── 🔄 Syncing Daily Expenses 4 Metadata ─────────────────")
+    try:
+        data = fetch_app_metadata(config=config, headless=not visible)
+        save_cached_metadata(data)
+    except Exception as exc:
+        console.print(f"[bold red]❌ Failed to sync metadata: {exc}[/bold red]")
+        return
+
+    accounts = data.get("accounts", [])
+    expense_cats = data.get("expense_categories", [])
+    income_cats = data.get("income_categories", [])
+
+    # Display results in structured tables
+    acc_table = Table(title="🏦 Active Accounts", show_header=True, header_style="bold cyan")
+    acc_table.add_column("#", style="dim", justify="right", width=4)
+    acc_table.add_column("Account Name", style="bold green")
+    for idx, acc in enumerate(accounts, 1):
+        acc_table.add_row(str(idx), acc)
+    console.print(acc_table)
+    console.print()
+
+    cat_table = Table(title="🏷️ Categories", show_header=True, header_style="bold cyan")
+    cat_table.add_column("Expense Categories (Gastos)", style="yellow")
+    cat_table.add_column("Income Categories (Ingresos)", style="green")
+
+    max_rows = max(len(expense_cats), len(income_cats))
+    for i in range(max_rows):
+        exp_val = expense_cats[i] if i < len(expense_cats) else ""
+        inc_val = income_cats[i] if i < len(income_cats) else ""
+        cat_table.add_row(exp_val, inc_val)
+    console.print(cat_table)
+
+    console.print(f"\n[bold green]✅ Synced metadata saved to: data/metadata.json[/bold green]")
+    console.print("[dim]Next template generation with --template will use these exact names.[/dim]\n")
 
 
 def run(
@@ -420,7 +486,17 @@ def main() -> None:
     parser.add_argument(
         "-t", "--template",
         action="store_true",
-        help="Generate a standard 'template.csv' in the current directory",
+        help="Generate Accounting Ledger 'template.xlsx' and 'template.csv'",
+    )
+    parser.add_argument(
+        "-s", "--sync-metadata",
+        action="store_true",
+        help="Fetch active accounts and categories from Daily Expenses 4 and save to local cache",
+    )
+    parser.add_argument(
+        "--sync",
+        action="store_true",
+        help="When used with --template, fetch fresh metadata from Daily Expenses 4 before generating",
     )
     parser.add_argument(
         "-a", "--account",
@@ -447,8 +523,14 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    if args.sync_metadata:
+        cfg = _load_config(args.config)
+        sync_metadata_command(config=cfg, visible=args.visible)
+        return
+
     if args.template:
-        generate_templates()
+        cfg = _load_config(args.config)
+        generate_templates(sync_first=args.sync, config=cfg)
         return
 
     if not args.input:

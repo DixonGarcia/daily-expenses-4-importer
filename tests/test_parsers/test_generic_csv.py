@@ -118,3 +118,39 @@ def test_generic_csv_parses_accounting_parentheses_amounts(tmp_path: Path):
     assert txs[1].description == "Interest Earned"
     assert txs[1].amount == Decimal("2.30")
     assert txs[1].tx_type == TransactionType.INCOME
+
+
+def test_generic_csv_parses_accounting_ledger_template(tmp_path: Path):
+    from daily_expenses_importer.core.template_generator import generate_csv_template
+    csv_file = tmp_path / "ledger_template.csv"
+    generate_csv_template(
+        csv_file,
+        accounts=["Checking Account", "Credit Card"],
+        expense_categories=["Groceries", "Healthcare", "Dining"],
+        income_categories=["Salary"],
+    )
+
+    parser = GenericCsvParser()
+    txs = parser.parse(csv_file)
+    assert len(txs) == 5
+
+    # 1. Expense row
+    assert txs[0].date == date(2026, 9, 15)
+    assert txs[0].description == "Supermarket Groceries"
+    assert txs[0].amount == Decimal("45.50")
+    assert txs[0].tx_type == TransactionType.EXPENSE
+    assert txs[0].category == "Groceries"
+
+    # 2. Income row
+    assert txs[1].date == date(2026, 9, 16)
+    assert txs[1].description == "Monthly Salary Deposit"
+    assert txs[1].amount == Decimal("1500.00")
+    assert txs[1].tx_type == TransactionType.INCOME
+    assert txs[1].category == "Salary"
+
+    # 3. Transfer row
+    assert txs[2].date == date(2026, 9, 17)
+    assert txs[2].tx_type == TransactionType.TRANSFER
+    assert txs[2].amount == Decimal("120.00")
+    assert txs[2].source_account == "Checking Account"
+    assert txs[2].target_account == "Credit Card"
