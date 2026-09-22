@@ -81,6 +81,15 @@ def _resolve_template_lists(
     return res_accounts, res_expense_cats, res_income_cats
 
 
+def _find_best_match(candidates: list[str], preferred: list[str], fallback: str) -> str:
+    """Find the best matching category or account name based on preferred keywords."""
+    for pref in preferred:
+        for c in candidates:
+            if pref.lower() in c.lower():
+                return c
+    return candidates[0] if candidates else fallback
+
+
 def generate_excel_template(
     dest_path: Path = Path("template.xlsx"),
     accounts: list[str] | None = None,
@@ -192,18 +201,19 @@ def generate_excel_template(
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
     # Default samples adapted to real or default values
-    sample_acc = acc_list[0] if acc_list else "Checking Account"
-    sample_acc2 = acc_list[1] if len(acc_list) > 1 else sample_acc
-    sample_exp_cat = exp_cats[0] if exp_cats else "Groceries"
-    sample_exp_cat2 = exp_cats[1] if len(exp_cats) > 1 else sample_exp_cat
-    sample_inc_cat = inc_cats[0] if inc_cats else "Salary"
+    sample_acc = _find_best_match(acc_list, ["checking", "corriente", "personal", "main"], "Checking Account")
+    sample_acc2 = _find_best_match([a for a in acc_list if a != sample_acc], ["credit", "tarjeta", "tdc", "card"], "Credit Card")
+    sample_exp_cat = _find_best_match(exp_cats, ["groceries", "food", "comida", "mercado"], "Groceries")
+    sample_exp_cat2 = _find_best_match(exp_cats, ["health", "pharmacy", "salud", "farmacia", "medicina"], "Healthcare")
+    sample_exp_dining = _find_best_match(exp_cats, ["dining", "restaurant", "restaurante"], sample_exp_cat)
+    sample_inc_cat = _find_best_match(inc_cats, ["salary", "sueldo", "salario", "nomina"], "Salary")
 
     sample_rows = [
         ("2026-09-15 14:30:00", "Supermarket Groceries", 45.50, None, sample_exp_cat, sample_acc),
         ("2026-09-16 09:15:00", "Monthly Salary Deposit", None, 1500.00, sample_inc_cat, sample_acc),
         ("2026-09-17 18:20:00", "Credit Card Payment", 120.00, None, None, f"{sample_acc} -> {sample_acc2}"),
         ("2026-09-18 11:45:00", "Pharmacy & Medicine", 12.30, None, sample_exp_cat2, sample_acc),
-        ("2026-09-19 20:30:00", "Restaurant Dinner", 34.00, None, sample_exp_cat, sample_acc2),
+        ("2026-09-19 20:30:00", "Restaurant Dinner", 34.00, None, sample_exp_dining, sample_acc2),
     ]
 
     for row_idx, row_data in enumerate(sample_rows, 2):
@@ -255,18 +265,19 @@ def generate_csv_template(
     """Generate a standard Accounting Ledger template.csv file."""
     acc_list, exp_cats, inc_cats = _resolve_template_lists(accounts, expense_categories, income_categories)
 
-    sample_acc = acc_list[0] if acc_list else "Checking Account"
-    sample_acc2 = acc_list[1] if len(acc_list) > 1 else sample_acc
-    sample_exp_cat = exp_cats[0] if exp_cats else "Groceries"
-    sample_exp_cat2 = exp_cats[1] if len(exp_cats) > 1 else sample_exp_cat
-    sample_inc_cat = inc_cats[0] if inc_cats else "Salary"
+    sample_acc = _find_best_match(acc_list, ["checking", "corriente", "personal", "main"], "Checking Account")
+    sample_acc2 = _find_best_match([a for a in acc_list if a != sample_acc], ["credit", "tarjeta", "tdc", "card"], "Credit Card")
+    sample_exp_cat = _find_best_match(exp_cats, ["groceries", "food", "comida", "mercado"], "Groceries")
+    sample_exp_cat2 = _find_best_match(exp_cats, ["health", "pharmacy", "salud", "farmacia", "medicina"], "Healthcare")
+    sample_exp_dining = _find_best_match(exp_cats, ["dining", "restaurant", "restaurante"], sample_exp_cat)
+    sample_inc_cat = _find_best_match(inc_cats, ["salary", "sueldo", "salario", "nomina"], "Salary")
 
     content = f"""date,description,expense,income,category,account
 2026-09-15 14:30:00,Supermarket Groceries,45.50,,{sample_exp_cat},{sample_acc}
 2026-09-16 09:15:00,Monthly Salary Deposit,,1500.00,{sample_inc_cat},{sample_acc}
 2026-09-17 18:20:00,Credit Card Payment,120.00,,,{sample_acc} -> {sample_acc2}
 2026-09-18 11:45:00,Pharmacy & Medicine,12.30,,{sample_exp_cat2},{sample_acc}
-2026-09-19 20:30:00,Restaurant Dinner,34.00,,{sample_exp_cat},{sample_acc2}
+2026-09-19 20:30:00,Restaurant Dinner,34.00,,{sample_exp_dining},{sample_acc2}
 """
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     dest_path.write_text(content, encoding="utf-8")

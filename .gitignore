@@ -26,6 +26,11 @@ data/metadata.json
 tmp/
 *.log
 
+# User templates and statements (contain real personal finances)
+template.xlsx
+template.csv
+failed_movements.csv
+
 # IDE & OS files
 .vscode/
 .idea/

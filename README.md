@@ -75,21 +75,24 @@ daily-expenses-importer --template
 daily-expenses-importer --template --sync
 ```
 
-This creates:
+This creates local files (automatically ignored by git to protect your privacy):
 - **`template.xlsx`**: Excel workbook with an **Instructions & Setup** sheet containing your active accounts and separated Expense vs. Income categories. The **Movements** sheet features:
   - **Dynamic Category Dropdowns**: If you input an amount under **Income**, the dropdown automatically filters to your income categories. If you input under **Expense**, it filters to your expense categories.
   - **Account Dropdown**: Pre-loaded with all your active accounts.
   - **Transfers**: Simply record the amount in the **Expense** column and use `Source Account -> Target Account` in the **Account** column.
 - **`template.csv`**: Equivalent plain text CSV file in accounting ledger format.
 
+*(Reference files `template.xlsx.example` and `template.csv.example` are included in the repository).*
+
 Example data format:
 
 ```csv
-Date & Time,Description,Expense,Income,Category,Account
-2026-09-15 14:30:00,Supermarket Groceries,45.50,,Comida,USD - Cash
-2026-09-16 09:15:00,Monthly Salary Deposit,,1500.00,Sueldo,BanPa Personal
-2026-09-17 18:20:00,Credit Card Payment,120.00,,,BanPa Personal -> TDC - Banesco
-2026-09-18 11:45:00,Pharmacy & Medicine,12.30,,Salud,USD - Cash
+date,description,expense,income,category,account
+2026-09-15 14:30:00,Supermarket Groceries,45.50,,Groceries,Checking Account
+2026-09-16 09:15:00,Monthly Salary Deposit,,1500.00,Salary,Checking Account
+2026-09-17 18:20:00,Credit Card Payment,120.00,,,Checking Account -> Credit Card
+2026-09-18 11:45:00,Pharmacy & Medicine,12.30,,Healthcare,Checking Account
+2026-09-19 20:30:00,Restaurant Dinner,34.00,,Dining,Credit Card
 ```
 
 Import your file:

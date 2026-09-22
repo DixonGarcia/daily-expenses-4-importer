@@ -1,0 +1,6 @@
+date,description,expense,income,category,account
+2026-09-15 14:30:00,Supermarket Groceries,45.50,,Groceries,Checking Account
+2026-09-16 09:15:00,Monthly Salary Deposit,,1500.00,Salary,Checking Account
+2026-09-17 18:20:00,Credit Card Payment,120.00,,,Checking Account -> Credit Card
+2026-09-18 11:45:00,Pharmacy & Medicine,12.30,,Healthcare,Checking Account
+2026-09-19 20:30:00,Restaurant Dinner,34.00,,Dining,Credit Card
