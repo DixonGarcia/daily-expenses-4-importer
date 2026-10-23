@@ -1,8 +1,8 @@
 """Playwright automation engine for Daily Expenses 4 (dailyexpenses4.com).
 
 Simulates user interaction with the Angular SPA at https://dailyexpenses4.com:
-  - Account selector:  <app-selector-account>
-  - Category selector: <app-selector-category>
+  - Account selector:  <app-modal-edit-account-selector> (legacy <app-selector-account>)
+  - Category selector: <app-modal-category-selector> (legacy <app-selector-category>)
   - Date & Time:       <app-date-time-picker> (mat-calendar + ngb-timepicker)
   - Save button:       button.save-movement-button
   - Self-healing state recovery on errors.
@@ -170,8 +170,8 @@ def recover_page_state(page: Page) -> None:
         modal = page.locator(_MODAL_ID)
         if modal.is_visible():
             close_btn = modal.locator(
-                "button.btn-close, [aria-label='Close'], button"
-            ).filter(has_text=re.compile(r"Cancelar|Cancel|Close", re.IGNORECASE))
+                "#closeButtonMovement, button.modal-close, button.btn-close, [aria-label='Close'], button"
+            ).filter(has_text=re.compile(r"Cancelar|Cancel|Close|^$", re.IGNORECASE))
             if close_btn.count() > 0:
                 close_btn.first.click()
                 page.wait_for_timeout(200)
@@ -199,26 +199,20 @@ def _open_movement_modal(page: Page) -> None:
 
     modal = page.locator(_MODAL_ID)
     if not modal.is_visible():
-        if "/movements" not in page.url and "/home" not in page.url:
-            movimientos_link = page.get_by_role("link", name=re.compile(r"Movimientos|Movements|Inicio|Home", re.IGNORECASE))
-            if movimientos_link.count() > 0:
-                movimientos_link.first.click()
-                page.wait_for_timeout(400)
-
-        fab_btn = page.locator(
-            "button.btn-circle-lg, button.btn-floating, button.floating-action-button, button.btn-primary:has(img[src*='icon-add']), button:has(i.bi-plus), button.btn-add-movement"
-        ).or_(page.get_by_role("button").filter(has_text=re.compile(r"^\s*\+\s*$")))
-
-        if fab_btn.count() > 0:
-            fab_btn.last.click()
+        if "/movements" not in page.url:
+            page.goto(f"{_APP_URL}/movements", wait_until="domcontentloaded", timeout=15_000)
 
         try:
-            modal.wait_for(state="visible", timeout=8_000)
+            page.evaluate("""() => {
+                const btn = document.getElementById('buttonOpenModalAdd') || document.querySelector('.btn-circle');
+                if (btn) btn.click();
+            }""")
+            modal.wait_for(state="visible", timeout=4_000)
         except Exception:
-            # Fallback retry click
+            fab_btn = page.locator("button.btn-circle:visible, button#buttonOpenModalAdd")
             if fab_btn.count() > 0:
-                fab_btn.last.click()
-            modal.wait_for(state="visible", timeout=8_000)
+                fab_btn.first.click(force=True)
+            modal.wait_for(state="visible", timeout=6_000)
 
     page.wait_for_timeout(150)
 
@@ -277,7 +271,7 @@ def _set_date_and_time(modal, target_date: date, target_time: str = "") -> None:
     target_year = target_date.year
     target_month = target_date.month
 
-    for _ in range(24):
+    for _ in range(72):
         header_btn = modal.locator("mat-calendar button.mat-calendar-period-button")
         if header_btn.count() == 0:
             break
@@ -345,39 +339,105 @@ def _set_date_and_time(modal, target_date: date, target_time: str = "") -> None:
 # ---------------------------------------------------------------------------
 
 def _select_account(modal, page: Page, account_name: str) -> None:
-    """Select account in <app-selector-account> component."""
+    """Select account in Add Movement modal.
+
+    Supports both the new <app-modal-edit-account-selector> sub-modal
+    and legacy <app-selector-account> dropdown.
+    """
     if not account_name:
         return
-    acc_btn = modal.locator("app-selector-account button")
-    if acc_btn.count() > 0:
-        acc_btn.first.click()
-        page.wait_for_timeout(200)
-        account_item = modal.locator("app-selector-account .dropdown-menu .item-list, app-selector-account .dropdown-item").filter(
-            has_text=re.compile(re.escape(account_name), re.IGNORECASE)
-        ).first
+    legacy = modal.locator("app-selector-account button")
+    if legacy.count() > 0:
+        legacy.first.click()
+        page.wait_for_timeout(250)
+        account_item = modal.locator(
+            "app-selector-account .dropdown-menu .item-list, app-selector-account .dropdown-item"
+        ).filter(has_text=re.compile(re.escape(account_name), re.IGNORECASE)).first
         if account_item.count() > 0:
             account_item.click()
         else:
             modal.get_by_text(account_name, exact=False).first.click()
-        page.wait_for_timeout(150)
+        page.wait_for_timeout(250)
+    else:
+        acc_trigger = modal.locator(
+            "button[data-bs-target='#app-modal-edit-account-selector']"
+        ).or_(modal.locator("button.movement-picker").first).first
+        acc_trigger.click()
+        page.wait_for_timeout(400)
+
+        acc_modal = page.locator("#app-modal-edit-account-selector")
+        acc_modal.wait_for(state="visible", timeout=6_000)
+
+        item = acc_modal.locator("button.account-row").filter(
+            has_text=re.compile(rf"\b{re.escape(account_name)}\b", re.IGNORECASE)
+        ).first
+        if item.count() == 0:
+            item = acc_modal.locator(".account-name").filter(
+                has_text=re.compile(rf"^\s*{re.escape(account_name)}\s*$", re.IGNORECASE)
+            ).first
+
+        if item.count() > 0:
+            item.click()
+        else:
+            acc_modal.get_by_text(account_name, exact=False).first.click()
+
+        page.wait_for_timeout(350)
+        if acc_modal.is_visible():
+            close_btn = acc_modal.locator(".modal-close, [aria-label='Close']").first
+            if close_btn.count() > 0:
+                close_btn.click()
+                page.wait_for_timeout(250)
 
 
 def _select_category(modal, page: Page, category_name: str) -> None:
-    """Select category in <app-selector-category> component."""
+    """Select category in Add Movement modal.
+
+    Supports both the new <app-modal-category-selector> sub-modal
+    and legacy <app-selector-category> dropdown.
+    """
     if not category_name:
         return
-    cat_btn = modal.locator("app-selector-category button")
-    if cat_btn.count() > 0:
-        cat_btn.first.click()
-        page.wait_for_timeout(200)
-        category_item = modal.locator("app-selector-category .dropdown-menu .item-list, app-selector-category .dropdown-item").filter(
-            has_text=re.compile(re.escape(category_name), re.IGNORECASE)
-        ).first
+    legacy = modal.locator("app-selector-category button")
+    if legacy.count() > 0:
+        legacy.first.click()
+        page.wait_for_timeout(250)
+        category_item = modal.locator(
+            "app-selector-category .dropdown-menu .item-list, app-selector-category .dropdown-item"
+        ).filter(has_text=re.compile(re.escape(category_name), re.IGNORECASE)).first
         if category_item.count() > 0:
             category_item.click()
         else:
             modal.get_by_text(category_name, exact=False).first.click()
-        page.wait_for_timeout(150)
+        page.wait_for_timeout(250)
+    else:
+        cat_trigger = modal.locator(
+            "button[data-bs-target='#movement-category-selector']"
+        ).or_(modal.locator("button.movement-picker").nth(1)).first
+        cat_trigger.click()
+        page.wait_for_timeout(400)
+
+        cat_modal = page.locator("#movement-category-selector")
+        cat_modal.wait_for(state="visible", timeout=6_000)
+
+        item = cat_modal.locator("button.account-row").filter(
+            has_text=re.compile(rf"^\s*{re.escape(category_name)}\b", re.IGNORECASE)
+        ).first
+        if item.count() == 0:
+            item = cat_modal.locator(".account-name").filter(
+                has_text=re.compile(rf"^\s*{re.escape(category_name)}\s*$", re.IGNORECASE)
+            ).first
+
+        if item.count() > 0:
+            item.click()
+        else:
+            cat_modal.get_by_text(category_name, exact=False).first.click()
+
+        page.wait_for_timeout(350)
+        if cat_modal.is_visible():
+            close_btn = cat_modal.locator(".modal-close, [aria-label='Close']").first
+            if close_btn.count() > 0:
+                close_btn.click()
+                page.wait_for_timeout(250)
 
 
 def load_expense(
@@ -393,8 +453,18 @@ def load_expense(
     _open_movement_modal(page)
     modal = page.locator(_MODAL_ID)
 
+    # 0. Ensure Expense tab is active if needed
+    expense_tab = modal.locator(
+        "button[data-tone='expense'], button.item-selector:has-text('Expense'), button.item-selector:has-text('Gasto')"
+    ).first
+    if expense_tab.count() > 0 and "is-selected" not in (expense_tab.get_attribute("class") or ""):
+        expense_tab.click()
+        page.wait_for_timeout(200)
+
     # 1. Amount
-    amount_field = modal.locator("input.quantity, input[type='number'], input[formcontrolname='quantity']").first
+    amount_field = modal.locator(
+        "#movement-amount, input.quantity, input[type='number'], input[formcontrolname='quantity']"
+    ).first
     amount_field.wait_for(state="visible", timeout=6_000)
     amount_field.click()
     amount_field.fill(f"{amount:.2f}" if isinstance(amount, (Decimal, float)) else str(amount))
@@ -406,7 +476,7 @@ def load_expense(
     _select_category(modal, page, category)
 
     # 4. Description
-    desc_field = modal.locator("textarea, input[formcontrolname='description']").first
+    desc_field = modal.locator("#movement-description, textarea, input[formcontrolname='description']").first
     if desc_field.count() > 0:
         desc_field.fill(description)
 
@@ -432,6 +502,67 @@ def load_expense(
     log_tx_loaded("EXPENSE", str(amount), description, category, account)
 
 
+def load_income(
+    page: Page,
+    amount: Decimal | float | int,
+    description: str,
+    category: str,
+    account: str,
+    income_date: date,
+    income_time: str = "",
+) -> None:
+    """Load a single income into Daily Expenses 4."""
+    _open_movement_modal(page)
+    modal = page.locator(_MODAL_ID)
+
+    # 0. Switch to Incomes tab
+    income_tab = modal.locator(
+        "button[data-tone='income'], button.item-selector:has-text('Income'), button.item-selector:has-text('Ingreso'), button:has-text('Incomes'), button:has-text('Ingresos'), a:has-text('Incomes'), a:has-text('Ingresos'), .nav-link:has-text('Incomes'), .nav-link:has-text('Ingresos')"
+    ).first
+    if income_tab.count() > 0:
+        income_tab.click()
+        page.wait_for_timeout(200)
+
+    # 1. Amount
+    amount_field = modal.locator(
+        "#movement-amount, input.quantity, input[type='number'], input[formcontrolname='quantity']"
+    ).first
+    amount_field.wait_for(state="visible", timeout=6_000)
+    amount_field.click()
+    amount_field.fill(f"{amount:.2f}" if isinstance(amount, (Decimal, float)) else str(amount))
+
+    # 2. Account
+    _select_account(modal, page, account)
+
+    # 3. Category
+    _select_category(modal, page, category)
+
+    # 4. Description
+    desc_field = modal.locator("#movement-description, textarea, input[formcontrolname='description']").first
+    if desc_field.count() > 0:
+        desc_field.fill(description)
+
+    # 5. Date & Time
+    _set_date_and_time(modal, target_date=income_date, target_time=income_time)
+
+    # 6. Save button
+    save_btn = modal.locator("button.save-movement-button, button[type='submit']").or_(
+        modal.locator("button").filter(has_text=re.compile(r"Save|Guardar", re.IGNORECASE))
+    ).first
+    save_btn.click()
+
+    # Wait for modal to dismiss cleanly
+    try:
+        modal.wait_for(state="hidden", timeout=8_000)
+    except Exception:
+        if modal.is_visible():
+            recover_page_state(page)
+            raise RuntimeError(f"Modal did not close after save for '{description}'.")
+
+    page.wait_for_timeout(250)
+    log_tx_loaded("INCOME", str(amount), description, category, account)
+
+
 def load_transfer(
     page: Page,
     from_account: str,
@@ -447,43 +578,89 @@ def load_transfer(
 
     # Switch to Transfer tab (supports both English and Spanish UI)
     transfer_tab = modal.locator(
-        "a:has-text('Transfer'), a:has-text('Transferencia'), button:has-text('Transfer'), button:has-text('Transferencia'), .nav-link:has-text('Transfer'), .nav-link:has-text('Transferencia')"
+        "button[data-tone='transfer'], button.item-selector:has-text('Transfer'), button.item-selector:has-text('Transferencia'), a:has-text('Transfer'), a:has-text('Transferencia'), button:has-text('Transfer'), button:has-text('Transferencia'), .nav-link:has-text('Transfer'), .nav-link:has-text('Transferencia')"
     ).first
     if transfer_tab.is_visible():
         transfer_tab.click()
         page.wait_for_timeout(200)
 
     # 1. Amount
-    amount_field = modal.locator("input.quantity, input[type='number'], input[formcontrolname='quantity']").first
+    amount_field = modal.locator(
+        "#movement-amount, input.quantity, input[type='number'], input[formcontrolname='quantity']"
+    ).first
     amount_field.click()
     amount_field.fill(f"{amount:.2f}" if isinstance(amount, (Decimal, float)) else str(amount))
 
     # 2. From Account
-    from_btn = modal.locator("app-selector-account-from button, select[formcontrolname='accountFrom']").first
-    if from_btn.is_visible():
-        if from_btn.evaluate("el => el.tagName.toLowerCase()") == "select":
-            from_btn.select_option(label=from_account)
+    legacy_from = modal.locator("app-selector-account-from button, select[formcontrolname='accountFrom']").first
+    if legacy_from.is_visible():
+        if legacy_from.evaluate("el => el.tagName.toLowerCase()") == "select":
+            legacy_from.select_option(label=from_account)
         else:
-            from_btn.click()
+            legacy_from.click()
             page.wait_for_timeout(150)
             modal.locator("app-selector-account-from .dropdown-item, app-selector-account-from .item-list").filter(
                 has_text=re.compile(re.escape(from_account), re.IGNORECASE)
             ).first.click()
+    else:
+        from_card = modal.locator(".transfer-account-card").first
+        if from_card.is_visible():
+            from_card.click()
+            page.wait_for_timeout(400)
+            acc_modal = page.locator("#app-modal-edit-account-selector")
+            acc_modal.wait_for(state="visible", timeout=6_000)
+            item = acc_modal.locator("button.account-row").filter(
+                has_text=re.compile(rf"\b{re.escape(from_account)}\b", re.IGNORECASE)
+            ).first
+            if item.count() == 0:
+                item = acc_modal.locator(".account-name").filter(
+                    has_text=re.compile(rf"^\s*{re.escape(from_account)}\s*$", re.IGNORECASE)
+                ).first
+            if item.count() > 0:
+                item.click()
+            else:
+                acc_modal.get_by_text(from_account, exact=False).first.click()
+            page.wait_for_timeout(350)
+            if acc_modal.is_visible():
+                acc_modal.locator(".modal-close, [aria-label='Close']").first.click()
+                page.wait_for_timeout(250)
 
     # 3. To Account
-    to_btn = modal.locator("app-selector-account-to button, select[formcontrolname='accountTo']").first
-    if to_btn.is_visible():
-        if to_btn.evaluate("el => el.tagName.toLowerCase()") == "select":
-            to_btn.select_option(label=to_account)
+    legacy_to = modal.locator("app-selector-account-to button, select[formcontrolname='accountTo']").first
+    if legacy_to.is_visible():
+        if legacy_to.evaluate("el => el.tagName.toLowerCase()") == "select":
+            legacy_to.select_option(label=to_account)
         else:
-            to_btn.click()
+            legacy_to.click()
             page.wait_for_timeout(150)
             modal.locator("app-selector-account-to .dropdown-item, app-selector-account-to .item-list").filter(
                 has_text=re.compile(re.escape(to_account), re.IGNORECASE)
             ).first.click()
+    else:
+        to_card = modal.locator(".transfer-account-card").last
+        if to_card.is_visible():
+            to_card.click()
+            page.wait_for_timeout(400)
+            acc_modal = page.locator("#app-modal-edit-account-selector")
+            acc_modal.wait_for(state="visible", timeout=6_000)
+            item = acc_modal.locator("button.account-row").filter(
+                has_text=re.compile(rf"\b{re.escape(to_account)}\b", re.IGNORECASE)
+            ).first
+            if item.count() == 0:
+                item = acc_modal.locator(".account-name").filter(
+                    has_text=re.compile(rf"^\s*{re.escape(to_account)}\s*$", re.IGNORECASE)
+                ).first
+            if item.count() > 0:
+                item.click()
+            else:
+                acc_modal.get_by_text(to_account, exact=False).first.click()
+            page.wait_for_timeout(350)
+            if acc_modal.is_visible():
+                acc_modal.locator(".modal-close, [aria-label='Close']").first.click()
+                page.wait_for_timeout(250)
 
     # 4. Description
-    desc_field = modal.locator("textarea, input[formcontrolname='description']").first
+    desc_field = modal.locator("#movement-description, textarea, input[formcontrolname='description']").first
     if desc_field.count() > 0:
         desc_field.fill(description)
 
@@ -529,6 +706,16 @@ def load_movement(page: Page, record: dict, default_account: str) -> None:
             transfer_time=tx_time,
             description=desc,
         )
+    elif tx_type == TransactionType.INCOME:
+        load_income(
+            page,
+            amount=amt,
+            description=desc,
+            category=cat,
+            account=target_acc,
+            income_date=tx_date,
+            income_time=tx_time,
+        )
     else:
         load_expense(
             page,
@@ -557,7 +744,7 @@ def run_automation(
             pw, session_file=session_file, headless=headless, slow_mo=slow_mo
         )
         page = context.new_page()
-        page.goto(f"{_APP_URL}/home", wait_until="domcontentloaded", timeout=25_000)
+        page.goto(f"{_APP_URL}/movements", wait_until="domcontentloaded", timeout=25_000)
         try:
             page.wait_for_selector("app-navbar, [routerlink='/movements']", timeout=8_000)
         except Exception:
